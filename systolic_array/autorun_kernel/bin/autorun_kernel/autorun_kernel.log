@@ -1,0 +1,6 @@
+Compiler Command: aoc -march=emulator -legacy-emulator device/autorun_kernel.cl -o bin/autorun_kernel.aocx -board=a10gx
+Compiler Warning: 
+Compiler Warning: The default channel depths in the emulation flow will be different from the hardware flow depths (0) to speed up emulation; To match the "__attribute__((depth(<depth>)))".
+Compiler Warning: or
+Compiler Warning: * Use compiler option: "-emulator-channel-depth-model=<model>".
+Compiler Warning: For more details run aoc -help.

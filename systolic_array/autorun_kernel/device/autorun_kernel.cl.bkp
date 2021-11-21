@@ -1,0 +1,267 @@
+// Copyright (c) <2017> Intel Corporation
+
+// Permission is hereby granted, free of charge, to any person obtaining a
+// copy of this software and associated documentation files (the
+//"Software"), to deal in the Software without restriction, including
+// without limitation the rights to use, copy, modify, merge, publish,
+// distribute, sublicense, and/or sell copies of the Software, and to
+// permit persons to whom the Software is furnished to do so, subject to
+// the following conditions:
+
+// The above copyright notice and this permission notice shall be included
+// in all copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+// IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+// CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+// TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+// SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+#pragma OPENCL EXTENSION cl_intel_channels : enable
+
+ #define CYCLE 10	
+
+
+ channel float channel_out[16] ;
+ channel float channel_blue[4] __attribute__((depth(1)));
+ channel float channel_red[4] __attribute__((depth(1)));
+ channel float channel_yellow[4][4] __attribute__((depth(1)));
+ channel float channel_brown[4][4] __attribute__((depth(1)));
+
+
+
+
+
+
+__attribute__((max_global_work_dim(0))) __kernel void
+reader(__global float *data_A, __global float *data_B, int size, __global float *out) {
+
+  __local float A_mem[4][4];
+  __local float B_mem[4][4];
+  __local float C_mem[16];
+  __local float prefetch_A[4][20];
+  __local float prefetch_B[20][4];
+
+//   bool valid[16] ; 	
+   bool  flag = false ;
+
+  int i, j;
+  for (i = 0; i < 4; i++) {
+    for (j = 0; j < 4; j++) {
+      A_mem[i][j] = data_A[4 * i + j];
+      B_mem[i][j] = data_B[4 * i + j];
+
+    }
+  }
+
+  for(i =0 ;i<20;i++)
+  {
+    for(j=0;j<4;j++)
+    {
+      prefetch_A[j][i]=0;
+      prefetch_B[i][j]=0;
+    }
+  }
+
+
+  for (i = 0; i < 4; i++) {
+    for (j = 0; j < 7; j++) {
+      if (i - j < 1) {
+        prefetch_A[i][j] = A_mem[i][3 + i - j];
+      }
+    }
+  }
+
+
+	for (i = 0 ; i < 7; i++) {
+	for (j = 0 ; j < 4; j++) {
+		
+		if(j-i < 1) 
+		prefetch_B[i][j] = B_mem[3-i+j][j] ;
+		
+		}
+		}
+
+        	prefetch_A[1][5]=0;
+		prefetch_A[1][6]=0;
+		prefetch_A[2][6]=0;
+
+prefetch_B[4][0]=0;
+prefetch_B[5][0]=0;
+prefetch_B[5][1]=0;
+prefetch_B[6][0]=0;
+prefetch_B[6][1]=0;
+prefetch_B[6][2]=0;
+
+// write_channel_intel(channel_flag,0);
+
+
+ /* for( i=0;i<4;i++)
+   {
+ 	  for( j=0;j<4;j++)
+ 	  {
+ 		 // write_channel_intel(channel_brown[i][j],0);
+ 		//  write_channel_intel(channel_yellow[i][j],0);
+ 	  }
+   } */
+
+
+ 	/*	  write_channel_intel(channel_brown[0][0],0);
+ 		  write_channel_intel(channel_brown[0][1],0);
+ 		  write_channel_intel(channel_brown[0][2],0);
+ 		  write_channel_intel(channel_brown[0][3],0);
+ 		  write_channel_intel(channel_brown[1][0],0);
+ 		  write_channel_intel(channel_brown[1][1],0);
+ 		  write_channel_intel(channel_brown[1][2],0);
+ 		  write_channel_intel(channel_brown[1][3],0);
+ 		  write_channel_intel(channel_brown[2][0],0);
+ 		  write_channel_intel(channel_brown[2][1],0);
+ 		  write_channel_intel(channel_brown[2][2],0);
+ 		  write_channel_intel(channel_brown[2][3],0);
+ 		  write_channel_intel(channel_brown[3][0],0);
+ 		  write_channel_intel(channel_brown[3][1],0);
+ 		  write_channel_intel(channel_brown[3][2],0);
+ 		  write_channel_intel(channel_brown[3][3],0);*/
+
+#pragma unroll
+for( j=0;j< CYCLE ;j++)
+{
+  for (i = 0; i < 4 ; i++) {
+//    printf("The value of j and i inside blue is %d %d\n",j,i);
+//printf("in writes:%d %f %f \n",j,prefetch_A[i][j],prefetch_B[j][i]);
+    write_channel_intel(channel_blue[i], prefetch_B[j][i]);
+    write_channel_intel(channel_red[i], prefetch_A[i][j]);
+  }
+
+}
+
+ 
+// while(~flag) {
+ for ( i = 0 ; i < 16 ; i++)
+ {
+//	if (valid[i] != true) {	
+ //	C_mem[i] = read_channel_nb_intel(channel_out[i] , &valid[i]); 
+ 	C_mem[i] = read_channel_intel(channel_out[i] ); 
+// 	}	
+	 	
+	//flag = (flag & valid[i]) ;
+ }
+
+ //}
+
+ for (i = 0 ; i < 16 ; i++)
+{
+   //    printf("\nC_mem[%d] = %f \n",i,C_mem[i]);	
+      out[i] = C_mem[i] ;
+}
+
+/*for( j=0;j<16;j++)
+{
+//  mem_fence(CLK_CHANNEL_MEM_FENCE);	
+//	C_mem[j] = read_channel_intel(channel_out);
+  printf("Output[%d]=%f \n",j,C_mem[j]);	
+
+}*/
+/*for (i = 0 ; i < 7 ;i ++)
+{
+	out[i] = C_mem[i] ;
+}*/ 
+
+
+
+}
+
+
+__attribute__((max_global_work_dim(0))) __attribute__((autorun))
+__attribute__((num_compute_units(4, 4)))
+__kernel void systolic_PE() {
+
+//  bool flag[16] ;
+
+  // while(1)
+  int compute_id_x = get_compute_id(0);
+  int compute_id_y = get_compute_id(1);
+  float input_b =0;
+  float input_a =0;
+  float input_c  ;
+  float count;
+  int index  ;
+
+  while(1) {
+  if (count != 0 ) {	  
+  if (compute_id_x == 0) 
+  {
+   input_b = read_channel_intel(channel_blue[compute_id_y]);
+  }
+  else
+  {
+    input_b=read_channel_intel(channel_brown[compute_id_x-1][compute_id_y]);
+  }
+
+
+   if (compute_id_y == 0) 		
+   {	
+	input_a = read_channel_intel(channel_red[compute_id_x]);
+   }
+
+   else {
+  	input_a = read_channel_intel(channel_yellow[compute_id_x][compute_id_y -1 ]);
+   	}
+
+
+   input_c = input_c + input_a*input_b;	
+   if(compute_id_x <3)
+    {
+   write_channel_intel(channel_brown[compute_id_x][compute_id_y],input_b);
+  // mem_fence(CLK_CHANNEL_MEM_FENCE);	
+    }
+
+   if ( compute_id_y < 3) { 
+
+   write_channel_intel(channel_yellow[compute_id_x][compute_id_y],input_a);
+  // mem_fence(CLK_CHANNEL_MEM_FENCE);	
+
+   }  
+  
+ 
+
+  /* if(count == CYCLE)
+    {
+      printf("inputs for PE[%d][%d]: %f %f \n",input_a,input_b,compute_id_x,compute_id_y);
+      printf("output for PE[%d][%d]: %f \n",compute_id_x,compute_id_y,input_c);	
+    }	*/	
+
+ /*  if ((compute_id_x == 3) && (compute_id_y == 3 )) { 
+    printf("\n in count =%f, sum = %f ,input_b data %f and input_a data %f for PE[%d][%d] \n",count,input_c, input_b,input_a,compute_id_x,compute_id_y);
+ }*/
+
+if(count == CYCLE)
+{
+  // printf("output : %f \n", input_c);
+  // printf("Count: %f",count);
+   //printf("PE[%d][%d], output: %f \n",compute_id_x,compute_id_y,input_c);
+   index = 4*compute_id_x + compute_id_y ;	
+    write_channel_intel(channel_out[index],input_c);
+}
+count = count +1 ;
+
+}
+else {
+		
+//   printf("%f ",count);
+   if (compute_id_x < 3) {	
+   write_channel_intel(channel_brown[compute_id_x][compute_id_y],0);
+}
+
+   if (compute_id_y < 3) {	
+   write_channel_intel(channel_yellow[compute_id_x][compute_id_y],0);
+}
+    count=count+1;
+ }	
+
+} 
+}
+
+
